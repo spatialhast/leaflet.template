@@ -5,11 +5,9 @@
 // 🍂class GridLayer.GoogleMutant
 // 🍂extends GridLayer
 L.GridLayer.GoogleMutant = L.GridLayer.extend({
-	includes: L.Mixin.Events,
-
 	options: {
 		minZoom: 0,
-		maxZoom: 18,
+		maxZoom: 23,
 		tileSize: 256,
 		subdomains: 'abc',
 		errorTileUrl: '',
@@ -49,6 +47,8 @@ L.GridLayer.GoogleMutant = L.GridLayer.extend({
 		this._freshTiles = {};	// Tiles from the mutant which haven't been requested yet
 
 		this._imagesPerTile = (this.options.type === 'hybrid') ? 2 : 1;
+
+		this._boundOnMutatedImage = this._onMutatedImage.bind(this);
 	},
 
 	onAdd: function (map) {
@@ -100,8 +100,10 @@ L.GridLayer.GoogleMutant = L.GridLayer.extend({
 		map.off('zoomend', this._handleZoomAnim, this);
 		map.off('resize', this._resize, this);
 
-		map._controlCorners.bottomright.style.marginBottom = '0em';
-		map._controlCorners.bottomleft.style.marginBottom = '0em';
+		if (map._controlCorners) {
+			map._controlCorners.bottomright.style.marginBottom = '0em';
+			map._controlCorners.bottomleft.style.marginBottom = '0em';
+		}
 	},
 
 	getAttribution: function () {
@@ -208,7 +210,21 @@ L.GridLayer.GoogleMutant = L.GridLayer.extend({
 				if (node instanceof HTMLImageElement) {
 					this._onMutatedImage(node);
 				} else if (node instanceof HTMLElement) {
-					Array.prototype.forEach.call(node.querySelectorAll('img'), this._onMutatedImage.bind(this));
+					Array.prototype.forEach.call(
+						node.querySelectorAll('img'),
+						this._boundOnMutatedImage
+					);
+
+					// Check for, and remove, the "Sorry, we have no imagery here"
+					// empty <div>s. The [style*="text-align: center"] selector
+					// avoids matching the attribution notice.
+					// This empty div doesn't have a reference to the tile
+					// coordinates, so it's not possible to mark the tile as
+					// failed.
+					Array.prototype.forEach.call(
+						node.querySelectorAll('div[draggable=false][style*="text-align: center"]'),
+						L.DomUtil.remove
+					)
 				}
 			}
 		}
